@@ -3,102 +3,7 @@ import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:logging/logging.dart';
 
-enum Flic2ButtonConnectionState {
-  disconnected,
-  connecting,
-  // ignore: constant_identifier_names
-  connecting_starting,
-  // ignore: constant_identifier_names
-  connected_ready,
-}
-
-class Flic2Button {
-  /// the unique ID of this button - a long ugly string
-  final String uuid;
-
-  /// the bluetooth address of this button
-  final String buttonAddr;
-
-  /// the time at which this button became ready last (not iOS)
-  final int readyTimestamp;
-
-  /// the friendly name of this button
-  final String name;
-
-  /// the serial number of this button
-  final String serialNo;
-
-  /// is this button connected etc
-  final Flic2ButtonConnectionState connectionState;
-
-  /// the firmware version
-  final int firmwareVersion;
-
-  /// the state of the battery % so from 0 - 100
-  final int? battPercentage;
-
-  /// the timestamp the batter data was stored (not iOS)
-  final int? battTimestamp;
-
-  /// the current voltage of the battery
-  final double? battVoltage;
-
-  /// a global counter of how often this button has been clicked
-  final int pressCount;
-
-  /// constructor
-  const Flic2Button({
-    required this.uuid,
-    required this.buttonAddr,
-    required this.readyTimestamp,
-    required this.name,
-    required this.serialNo,
-    required this.connectionState,
-    required this.firmwareVersion,
-    required this.battPercentage,
-    required this.battTimestamp,
-    required this.battVoltage,
-    required this.pressCount,
-  });
-}
-
-class Flic2ButtonClick {
-  /// the button
-  final Flic2Button button;
-
-  /// was this click stored in the queue, button comes back into range and sends it's cache
-  final bool wasQueued;
-
-  /// is this click the last in the queue
-  final bool lastQueued;
-
-  /// the age (ms) of this click when in a queue (if it was ages maybe you want to ignore it)
-  final int clickAge;
-
-  /// the timestamp of this click from the button (not in iOS)
-  final int timestamp;
-
-  /// was this a single click
-  final bool isSingleClick;
-
-  /// was this a double click
-  final bool isDoubleClick;
-
-  /// was this a long hold of the button
-  final bool isHold;
-
-  /// constructor
-  const Flic2ButtonClick({
-    required this.wasQueued,
-    required this.clickAge,
-    required this.lastQueued,
-    required this.timestamp,
-    required this.isSingleClick,
-    required this.isDoubleClick,
-    required this.isHold,
-    required this.button,
-  });
-}
+import 'models.dart';
 
 abstract class Flic2Listener {
   /// called as a button is found by the plugin (while scanning)
@@ -110,8 +15,11 @@ abstract class Flic2Listener {
   /// called as an already paired button is found by the plugin (while scanning)
   void onPairedButtonDiscovered(Flic2Button button) {}
 
-  /// called by the plugin as a button is clicked
-  void onButtonClicked(Flic2ButtonClick buttonClick);
+  void onButtonSingleOrDoubleClickOrHold(
+      Flic2ButtonSingleOrDoubleClickOrHold buttonClick);
+  void onButtonUpOrDown(Flic2ButtonUpOrDown buttonClick);
+  void onButtonClickOrHold(Flic2ButtonClickOrHold buttonClick);
+  void onButtonSingleOrDoubleClick(Flic2ButtonSingleOrDoubleClick buttonClick);
 
   /// called by the plugin as a button becomes connected
   void onButtonConnected() {}
@@ -154,29 +62,24 @@ class FlicButtonPlugin {
   // ignore: constant_identifier_names
   static const String ERROR_INVALID_ARGUMENTS = 'INVALID_ARGUMENTS';
 
-  // ignore: constant_identifier_names
-  static const int METHOD_FLIC2_DISCOVER_PAIRED = 100;
-  // ignore: constant_identifier_names
-  static const int METHOD_FLIC2_DISCOVERED = 101;
-  // ignore: constant_identifier_names
-  static const int METHOD_FLIC2_CONNECTED = 102;
-  // ignore: constant_identifier_names
-  static const int METHOD_FLIC2_CLICK = 103;
-  // ignore: constant_identifier_names
-  static const int METHOD_FLIC2_SCANNING = 104;
-  // ignore: constant_identifier_names
-  static const int METHOD_FLIC2_SCAN_COMPLETE = 105;
-  // ignore: constant_identifier_names
-  static const int METHOD_FLIC2_FOUND = 106;
-  // ignore: constant_identifier_names
-  static const int METHOD_FLIC2_ERROR = 200;
+  static const int methodFlic2DiscoverPaired = 100;
+  static const int methodFlic2Discovered = 101;
+  static const int methodFlic2Connected = 102;
+  static const int methodFlic2Scanning = 103;
+  static const int methodFlic2ScanComplete = 104;
+  static const int methodFlic2Found = 105;
+  static const int methodFlic2Error = 200;
+  static const int methodFlic2ButtonClickSingleOrDoubleClickOrHold = 301;
+  static const int methodFlic2ButtonUpDown = 302;
+  static const int methodFlic2ButtonClickOrHold = 303;
+  static const int methodFlic2ButtonSingleOrDoubleClick = 304;
 
   static const MethodChannel _channel = MethodChannel(_channelName);
 
   Future<bool?>? _invokationFuture;
 
   final Flic2Listener flic2listener;
-  
+
   final log = Logger('FlicButtonPlugin');
 
   FlicButtonPlugin({required this.flic2listener}) {
@@ -247,10 +150,15 @@ class FlicButtonPlugin {
   Future<List<Flic2Button>> getFlic2Buttons() async {
     // get the buttons
     final buttons = await _channel.invokeMethod<List?>(_methodNameGetButtons);
+    print("buttons: $buttons");
     if (null == buttons) {
       return [];
     } else {
-      return buttons.map((e) => _createFlic2FromData(e)).toList();
+      var result = buttons
+          .map((e) => createFlic2ButtonFromData(e as String) as Flic2Button)
+          .toList();
+      print("result: $result");
+      return result;
     }
   }
 
@@ -263,98 +171,7 @@ class FlicButtonPlugin {
       // not a valid button
       return null;
     } else {
-      return _createFlic2FromData(buttonString);
-    }
-  }
-
-  /// helper to convert the int from the native to a nice enum
-  Flic2ButtonConnectionState _connectionStateFromChannelCode(int code) {
-    switch (code) {
-      case 0:
-        return Flic2ButtonConnectionState.disconnected;
-      case 1:
-        return Flic2ButtonConnectionState.connecting;
-      case 2:
-        return Flic2ButtonConnectionState.connecting_starting;
-      case 3:
-        return Flic2ButtonConnectionState.connected_ready;
-      default:
-        return Flic2ButtonConnectionState.disconnected;
-    }
-  }
-
-  /// helper to convert the json from native to the object passed around in flutter
-  Flic2Button _createFlic2FromData(Object data) {
-    try {
-      // create a button from this json data
-      Map json;
-      if (data is String) {
-        // from string data, let's get the map of data
-        json = jsonDecode(data);
-      } else if (data is Map) {
-        // this is JSON already, so just use as-is
-        json = data;
-      } else {
-        throw ('data $data is not a string or a map');
-      }
-      return Flic2Button(
-        uuid: json['uuid'],
-        buttonAddr: json['bdAddr'],
-        readyTimestamp: json['readyTime'],
-        name: json['name'],
-        serialNo: json['serialNo'],
-        connectionState: _connectionStateFromChannelCode(json['connection']),
-        firmwareVersion: json['firmwareVer'],
-        battPercentage: json['battPerc'],
-        battTimestamp: json['battTime'],
-        battVoltage: json['battVolt'],
-        pressCount: json['pressCount'],
-      );
-    } catch (error) {
-      log.warning('data back is not a valid button: $data $error');
-      // return an error button
-      return const Flic2Button(
-          uuid: '',
-          buttonAddr: '',
-          readyTimestamp: 0,
-          name: '',
-          serialNo: '',
-          connectionState: Flic2ButtonConnectionState.disconnected,
-          firmwareVersion: 0,
-          battPercentage: 0,
-          battTimestamp: 0,
-          battVoltage: 0.0,
-          pressCount: 0);
-    }
-  }
-
-  /// helper to convert the json from native to the object passed around in flutter
-  Flic2ButtonClick _createFlic2ClickFromData(String data) {
-    try {
-      final json = jsonDecode(data);
-      return Flic2ButtonClick(
-        wasQueued: json['wasQueued'],
-        clickAge: json['clickAge'],
-        lastQueued: json['lastQueued'],
-        timestamp: json['timestamp'],
-        isSingleClick: json['isSingleClick'],
-        isDoubleClick: json['isDoubleClick'],
-        isHold: json['isHold'],
-        button: _createFlic2FromData(json['button']),
-      );
-    } catch (error) {
-      log.warning('data back is not a valid click: $data $error');
-      // return error button click data
-      return Flic2ButtonClick(
-        wasQueued: false,
-        clickAge: 0,
-        lastQueued: false,
-        timestamp: 0,
-        isSingleClick: false,
-        isDoubleClick: false,
-        isHold: false,
-        button: _createFlic2FromData(''),
-      );
+      return createFlic2ButtonFromData(buttonString);
     }
   }
 
@@ -368,39 +185,78 @@ class FlicButtonPlugin {
         // function that is required then (by the passed data)
         final methodId = call.arguments['method'] ?? '';
         final methodData = call.arguments['data'] ?? '';
+
+        print("methodId: $methodId");
+
         // get the callback that's registered with this ID to call it
         switch (methodId) {
-          case METHOD_FLIC2_DISCOVER_PAIRED:
-            // process this method - have discovered a paired flic 2 button
-            flic2listener
-                .onPairedButtonDiscovered(_createFlic2FromData(methodData));
+          case methodFlic2DiscoverPaired:
+            {
+              var message = createFlic2ButtonFromData(methodData);
+              if (message != null) {
+                flic2listener.onPairedButtonDiscovered(message);
+              }
+            }
             break;
-          case METHOD_FLIC2_DISCOVERED:
+          case methodFlic2Discovered:
             // process this method - have discovered a flic 2 button, but just the address which isn't great
             flic2listener.onButtonDiscovered(methodData);
             break;
-          case METHOD_FLIC2_CONNECTED:
+          case methodFlic2Connected:
             // process this method - have connected a flic 2 button
             flic2listener.onButtonConnected();
             break;
-          case METHOD_FLIC2_FOUND:
-            // process this method - have found a flic 2 button
-            flic2listener.onButtonFound(_createFlic2FromData(methodData));
+          case methodFlic2Found:
+            {
+              var message = createFlic2ButtonFromData(methodData);
+              if (message != null) {
+                flic2listener.onButtonFound(message);
+              }
+            }
             break;
-          case METHOD_FLIC2_CLICK:
-            // process this method - have clicked a flic 2 button
-            flic2listener
-                .onButtonClicked(_createFlic2ClickFromData(methodData));
+          case methodFlic2ButtonClickSingleOrDoubleClickOrHold:
+            {
+              var message =
+                  createFlic2ButtonSingleOrDoubleClickOrHoldEvent(methodData);
+              if (message != null) {
+                flic2listener.onButtonSingleOrDoubleClickOrHold(message);
+              }
+            }
             break;
-          case METHOD_FLIC2_SCANNING:
+          case methodFlic2ButtonUpDown:
+            {
+              var message = createFlic2ButtonUpOrDownEvent(methodData);
+              if (message != null) {
+                flic2listener.onButtonUpOrDown(message);
+              }
+            }
+            break;
+          case methodFlic2ButtonClickOrHold:
+            {
+              var message = createFlic2ButtonClickOrHoldEvent(methodData);
+              if (message != null) {
+                flic2listener.onButtonClickOrHold(message);
+              }
+            }
+            break;
+          case methodFlic2ButtonSingleOrDoubleClick:
+            {
+              var message =
+                  createFlic2ButtonSingleOrDoubleClickEvent(methodData);
+              if (message != null) {
+                flic2listener.onButtonSingleOrDoubleClick(message);
+              }
+            }
+            break;
+          case methodFlic2Scanning:
             // process this method - scanning for buttons
             flic2listener.onScanStarted();
             break;
-          case METHOD_FLIC2_SCAN_COMPLETE:
+          case methodFlic2ScanComplete:
             // process this method - scanning for buttons completed
             flic2listener.onScanCompleted();
             break;
-          case METHOD_FLIC2_ERROR:
+          case methodFlic2Error:
             // process this method - scanning for buttons completed
             flic2listener.onFlic2Error(methodData);
             break;

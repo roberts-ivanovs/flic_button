@@ -1,6 +1,8 @@
+import 'package:flic_button/models.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flic_button/flic_button.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   runApp(MyApp());
@@ -18,7 +20,7 @@ class _MyAppState extends State<MyApp> with Flic2Listener {
   // as we discover buttons, lets add them to a map of uuid/button to show
   final Map<String, Flic2Button> _buttonsFound = {};
   // the last click to show we are hearing the button click
-  Flic2ButtonClick? _lastClick;
+  String? _lastClick;
 
   // the plugin manager to use while we are active
   FlicButtonPlugin? flicButtonManager;
@@ -45,9 +47,15 @@ class _MyAppState extends State<MyApp> with Flic2Listener {
     });
   }
 
-  void _startStopFlic2() {
+  void _startStopFlic2() async {
     // start or stop the plugin (iOS doesn't stop)
     if (null == flicButtonManager) {
+      await Permission.location.request();
+      await Permission.bluetoothScan.request();
+      await Permission.bluetooth.request();
+      await Permission.bluetoothConnect.request();
+      await Permission.bluetoothAdvertise.request();
+
       // we are not started - start listening to FLIC2 buttons
       setState(() => flicButtonManager = FlicButtonPlugin(flic2listener: this));
     } else {
@@ -152,16 +160,12 @@ class _MyAppState extends State<MyApp> with Flic2Listener {
                                   : 'Scan for buttons')),
                         ],
                       ),
-                    if (null != _lastClick)
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Text(
-                          'FLIC2 @${_lastClick!.button.buttonAddr}\nclicked ${_lastClick!.timestamp - _lastClick!.button.readyTimestamp}ms from ready state\n'
-                          '${_lastClick!.isSingleClick ? 'single click\n' : ''}'
-                          '${_lastClick!.isDoubleClick ? 'double click\n' : ''}'
-                          '${_lastClick!.isHold ? 'hold\n' : ''}',
-                        ),
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Text(
+                        'Last click: $_lastClick ?? "asd" ',
                       ),
+                    ),
                     if (_isScanning)
                       Text(
                           'Hold down your flic2 button so we can find it now we are scanning...'),
@@ -213,12 +217,42 @@ class _MyAppState extends State<MyApp> with Flic2Listener {
   }
 
   @override
-  void onButtonClicked(Flic2ButtonClick buttonClick) {
-    // callback from the plugin that someone just clicked a button
-    print('button ${buttonClick.button.uuid} clicked');
-    setState(() {
-      _lastClick = buttonClick;
-    });
+  void onButtonSingleOrDoubleClickOrHold(
+      Flic2ButtonSingleOrDoubleClickOrHold buttonClick) {
+    // print(buttonClick.toString());
+
+    // setState(() {
+    //   _lastClick = buttonClick.toString();
+    // });
+  }
+
+  @override
+  void onButtonUpOrDown(Flic2ButtonUpOrDown buttonClick) {
+    if (buttonClick.isUp) {
+      print(buttonClick.toString());
+
+      setState(() {
+        _lastClick = buttonClick.toString();
+      });
+    }
+  }
+
+  @override
+  void onButtonClickOrHold(Flic2ButtonClickOrHold buttonClick) {
+    // print(buttonClick.toString());
+
+    // setState(() {
+    //   _lastClick = buttonClick.toString();
+    // });
+  }
+
+  @override
+  void onButtonSingleOrDoubleClick(Flic2ButtonSingleOrDoubleClick buttonClick) {
+    // print(buttonClick.toString());
+
+    // setState(() {
+    //   _lastClick = buttonClick.toString();
+    // });
   }
 
   @override

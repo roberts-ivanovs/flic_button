@@ -26,8 +26,13 @@ public class Flic2Controller {
         void onButtonConnected();
         void onButtonDiscovered(String buttonAddress);
         void onButtonScanningStarted();
+
         void onButtonScanningStopped();
-        void onButtonClicked(Flic2Button button, boolean wasQueued, boolean lastQueued, long timestamp, boolean isSingleClick, boolean isDoubleClick, boolean isHold);
+        void onButtonSingleOrDoubleClickOrHold(Flic2Button button, boolean wasQueued, boolean lastQueued,
+                long timestamp, boolean isSingleClick, boolean isDoubleClick, boolean isHold);
+        void onButtonUpOrDown(Flic2Button button, boolean wasQueued, boolean lastQueued, long timestamp, boolean isUp, boolean isDown);
+        void onButtonClickOrHold(Flic2Button button, boolean wasQueued, boolean lastQueued, long timestamp, boolean isClick, boolean isHold);
+        void onButtonSingleOrDoubleClick(Flic2Button button, boolean wasQueued, boolean lastQueued, long timestamp, boolean isSingleClick, boolean isDoubleClick);
         void onError(String error);
     }
 
@@ -99,7 +104,7 @@ public class Flic2Controller {
             buttonsDiscovered.put(button.getUuid(), button);
         }
     }
-    
+
     public List<Flic2Button> getButtonsDiscovered() {
         List<Flic2Button> buttons = Flic2Manager.getInstance().getButtons();
         for (Flic2Button button : buttons) {
@@ -108,7 +113,7 @@ public class Flic2Controller {
         }
         return buttons;
     }
-    
+
     public Flic2Button getButtonForAddress(String buttonAddress) {
         return Flic2Manager.getInstance().getButtonByBdAddr(buttonAddress);
     }
@@ -160,7 +165,7 @@ public class Flic2Controller {
             return true;
         }
     }
-    
+
     public boolean listenToButton(String buttonUuid) {
         // get the button to listen to from our map and then listen to it
         Flic2Button button;
@@ -206,7 +211,31 @@ public class Flic2Controller {
             // let the base deal
             super.onButtonSingleOrDoubleClickOrHold(button, wasQueued, lastQueued, timestamp, isSingleClick, isDoubleClick, isHold);
             // and pass this button press from Flic2 on to our application
-            callback.onButtonClicked(button, wasQueued, lastQueued, timestamp, isSingleClick, isDoubleClick, isHold);
+            callback.onButtonSingleOrDoubleClickOrHold(button, wasQueued, lastQueued, timestamp, isSingleClick, isDoubleClick, isHold);
+        }
+
+        @Override
+        public void onButtonUpOrDown(Flic2Button button, boolean wasQueued, boolean lastQueued, long timestamp, boolean isUp, boolean isDown) {
+            // let the base deal
+            super.onButtonUpOrDown(button, wasQueued, lastQueued, timestamp, isUp, isDown);
+            // and pass this button press from Flic2 on to our application
+            callback.onButtonUpOrDown(button, wasQueued, lastQueued, timestamp, isUp, isDown);
+        }
+
+        @Override
+        public void onButtonClickOrHold(Flic2Button button, boolean wasQueued, boolean lastQueued, long timestamp, boolean isClick, boolean isHold) {
+            // let the base deal
+            super.onButtonClickOrHold(button, wasQueued, lastQueued, timestamp, isClick, isHold);
+            // and pass this button press from Flic2 on to our application
+            callback.onButtonClickOrHold(button, wasQueued, lastQueued, timestamp, isClick, isHold);
+        }
+
+        @Override
+        public void onButtonSingleOrDoubleClick(Flic2Button button, boolean wasQueued, boolean lastQueued, long timestamp, boolean isSingleClick, boolean isDoubleClick) {
+            // let the base deal
+            super.onButtonSingleOrDoubleClick(button, wasQueued, lastQueued, timestamp, isSingleClick, isDoubleClick);
+            // and pass this button press from Flic2 on to our application
+            callback.onButtonSingleOrDoubleClick(button, wasQueued, lastQueued, timestamp, isSingleClick, isDoubleClick);
         }
     };
 
