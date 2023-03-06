@@ -58,7 +58,6 @@ class _MyAppState extends State<MyApp> with Flic2Listener {
 
       // we are not started - start listening to FLIC2 buttons
       var manager = FlicButtonPlugin(this);
-      await manager.init();
       setState(() => flicButtonManager = manager);
     } else {
       // started - so stop
@@ -120,7 +119,9 @@ class _MyAppState extends State<MyApp> with Flic2Listener {
             title: const Text('Flic Button Plugin Example'),
           ),
           body: FutureBuilder(
-            future: null,
+            future: flicButtonManager != null
+                ? flicButtonManager!.invokationFuture
+                : null,
             builder: (ctx, snapshot) {
               if (snapshot.connectionState != ConnectionState.done) {
                 // are not initialized yet, wait a sec - should be very quick!

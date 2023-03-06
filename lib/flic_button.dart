@@ -77,6 +77,7 @@ class FlicButtonPlugin {
   static const MethodChannel _channel = MethodChannel(_channelName);
 
   Flic2Listener _flic2listener;
+  late Future<bool?> invokationFuture;
 
   set flic2listener(Flic2Listener flic2listener) {
     _flic2listener = flic2listener;
@@ -88,12 +89,7 @@ class FlicButtonPlugin {
     // set the callback handler to ours to receive all our data back after
     // initialized
     _channel.setMethodCallHandler(_methodCallHandler);
-  }
-
-  /// accessor to get the invokation future so your UI can wait till it's running properly
-  Future<bool?> init() async {
-    // an invoke the function to initialise the handling of Flic 2
-    return await _channel.invokeMethod<bool>(_methodNameInitialize);
+    invokationFuture = _channel.invokeMethod<bool>(_methodNameInitialize);
   }
 
   /// dispose of this plugin to shut it all down (iOS doesn't at the moment)
