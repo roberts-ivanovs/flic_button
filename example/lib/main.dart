@@ -57,7 +57,9 @@ class _MyAppState extends State<MyApp> with Flic2Listener {
       await Permission.bluetoothAdvertise.request();
 
       // we are not started - start listening to FLIC2 buttons
-      setState(() => flicButtonManager = FlicButtonPlugin(flic2listener: this));
+      var manager = FlicButtonPlugin(this);
+      await manager.init();
+      setState(() => flicButtonManager = manager);
     } else {
       // started - so stop
       flicButtonManager!.disposeFlic2().then((value) => setState(() {
@@ -118,9 +120,7 @@ class _MyAppState extends State<MyApp> with Flic2Listener {
             title: const Text('Flic Button Plugin Example'),
           ),
           body: FutureBuilder(
-            future: flicButtonManager != null
-                ? flicButtonManager!.invokation
-                : null,
+            future: null,
             builder: (ctx, snapshot) {
               if (snapshot.connectionState != ConnectionState.done) {
                 // are not initialized yet, wait a sec - should be very quick!
