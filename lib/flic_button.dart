@@ -78,11 +78,15 @@ class FlicButtonPlugin {
 
   Future<bool?>? _invokationFuture;
 
-  final Flic2Listener flic2listener;
+  Flic2Listener _flic2listener;
+
+  set flic2listener(Flic2Listener flic2listener) {
+    _flic2listener = flic2listener;
+  }
 
   final log = Logger('FlicButtonPlugin');
 
-  FlicButtonPlugin({required this.flic2listener}) {
+  FlicButtonPlugin(this._flic2listener) {
     // set the callback handler to ours to receive all our data back after
     // initialized
     _channel.setMethodCallHandler(_methodCallHandler);
@@ -150,14 +154,12 @@ class FlicButtonPlugin {
   Future<List<Flic2Button>> getFlic2Buttons() async {
     // get the buttons
     final buttons = await _channel.invokeMethod<List?>(_methodNameGetButtons);
-    print("buttons: $buttons");
     if (null == buttons) {
       return [];
     } else {
       var result = buttons
           .map((e) => createFlic2ButtonFromData(e as String) as Flic2Button)
           .toList();
-      print("result: $result");
       return result;
     }
   }
@@ -186,31 +188,29 @@ class FlicButtonPlugin {
         final methodId = call.arguments['method'] ?? '';
         final methodData = call.arguments['data'] ?? '';
 
-        print("methodId: $methodId");
-
         // get the callback that's registered with this ID to call it
         switch (methodId) {
           case methodFlic2DiscoverPaired:
             {
               var message = createFlic2ButtonFromData(methodData);
               if (message != null) {
-                flic2listener.onPairedButtonDiscovered(message);
+                _flic2listener.onPairedButtonDiscovered(message);
               }
             }
             break;
           case methodFlic2Discovered:
             // process this method - have discovered a flic 2 button, but just the address which isn't great
-            flic2listener.onButtonDiscovered(methodData);
+            _flic2listener.onButtonDiscovered(methodData);
             break;
           case methodFlic2Connected:
             // process this method - have connected a flic 2 button
-            flic2listener.onButtonConnected();
+            _flic2listener.onButtonConnected();
             break;
           case methodFlic2Found:
             {
               var message = createFlic2ButtonFromData(methodData);
               if (message != null) {
-                flic2listener.onButtonFound(message);
+                _flic2listener.onButtonFound(message);
               }
             }
             break;
@@ -219,7 +219,7 @@ class FlicButtonPlugin {
               var message =
                   createFlic2ButtonSingleOrDoubleClickOrHoldEvent(methodData);
               if (message != null) {
-                flic2listener.onButtonSingleOrDoubleClickOrHold(message);
+                _flic2listener.onButtonSingleOrDoubleClickOrHold(message);
               }
             }
             break;
@@ -227,7 +227,7 @@ class FlicButtonPlugin {
             {
               var message = createFlic2ButtonUpOrDownEvent(methodData);
               if (message != null) {
-                flic2listener.onButtonUpOrDown(message);
+                _flic2listener.onButtonUpOrDown(message);
               }
             }
             break;
@@ -235,7 +235,7 @@ class FlicButtonPlugin {
             {
               var message = createFlic2ButtonClickOrHoldEvent(methodData);
               if (message != null) {
-                flic2listener.onButtonClickOrHold(message);
+                _flic2listener.onButtonClickOrHold(message);
               }
             }
             break;
@@ -244,21 +244,21 @@ class FlicButtonPlugin {
               var message =
                   createFlic2ButtonSingleOrDoubleClickEvent(methodData);
               if (message != null) {
-                flic2listener.onButtonSingleOrDoubleClick(message);
+                _flic2listener.onButtonSingleOrDoubleClick(message);
               }
             }
             break;
           case methodFlic2Scanning:
             // process this method - scanning for buttons
-            flic2listener.onScanStarted();
+            _flic2listener.onScanStarted();
             break;
           case methodFlic2ScanComplete:
             // process this method - scanning for buttons completed
-            flic2listener.onScanCompleted();
+            _flic2listener.onScanCompleted();
             break;
           case methodFlic2Error:
             // process this method - scanning for buttons completed
-            flic2listener.onFlic2Error(methodData);
+            _flic2listener.onFlic2Error(methodData);
             break;
           default:
             log.severe('unrecognised method callback encountered $methodId');
